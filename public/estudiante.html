@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Estudiante</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        #map { height: 100vh; margin: 0; padding: 0; }
+        body, html { margin: 0; padding: 0; height: 100%; }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+    const socket = io();
+    const map = L.map('map').setView([0, 0], 15);
+    let marcadorBus = null;
+    let marcadorEstudiante = null;
+    let ruta = [];
+    let polyline = null;
+
+    // Carga el mapa base
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Obtener ubicación del estudiante (tú)
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition((position) => {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            const miUbicacion = [lat, lng];
+
+            marcadorEstudiante = L.marker(miUbicacion, {
+                title: "Tú estás aquí",
+                icon: L.icon({
+                    iconUrl: 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png',
+                    iconSize: [25, 41],
+                    iconAnchor: [12, 41]
+                })
+            }).addTo(map);
+
+            map.setView(miUbicacion, 15);
+        }, () => {
+            alert("No se pudo obtener tu ubicación.");
+        });
+    } else {
+        alert("Tu navegador no permite geolocalización.");
+    }
+
+    // Escuchar ubicación del bus
+    socket.on('ubicacion', (data) => {
+        const ubicacionBus = [data.lat, data.lng];
+
+        if (marcadorBus) {
+            marcadorBus.setLatLng(ubicacionBus);
+        } else {
+            marcadorBus = L.marker(ubicacionBus, {
+                title: "Bus",
+                icon: L.icon({
+                    iconUrl: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
+                    iconSize: [25, 41],
+                    iconAnchor: [12, 41]
+                })
+            }).addTo(map);
+        }
+
+        // Dibujar la ruta del bus
+        ruta.push(ubicacionBus);
+        if (polyline) {
+            polyline.setLatLngs(ruta);
+        } else {
+            polyline = L.polyline(ruta, { color: 'red' }).addTo(map);
+        }
+    });
+</script>
+
+</body>
+</html>

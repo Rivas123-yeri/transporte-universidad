@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Conductor</title>
+</head>
+<body>
+    <h1>Conductor - Compartiendo ubicación</h1>
+    <button id="btnToggle">Iniciar rastreo</button>
+    <p id="status">Rastreo detenido</p>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let watchId = null;
+        const btnToggle = document.getElementById('btnToggle');
+        const status = document.getElementById('status');
+
+        function enviarUbicacion(pos) {
+            socket.emit('ubicacion', {
+                lat: pos.coords.latitude,
+                lng: pos.coords.longitude
+            });
+            status.textContent = `Enviando ubicación: ${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`;
+        }
+
+        function errorUbicacion() {
+            alert("No se pudo obtener la ubicación.");
+            stopTracking();
+        }
+
+        function startTracking() {
+            if (!navigator.geolocation) {
+                alert("Tu navegador no soporta Geolocalización.");
+                return;
+            }
+            watchId = navigator.geolocation.watchPosition(enviarUbicacion, errorUbicacion, {
+                enableHighAccuracy: true,
+                maximumAge: 3000,
+                timeout: 5000
+            });
+            btnToggle.textContent = 'Detener rastreo';
+            status.textContent = 'Rastreo iniciado...';
+        }
+
+        function stopTracking() {
+            if (watchId !== null) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+            }
+            btnToggle.textContent = 'Iniciar rastreo';
+            status.textContent = 'Rastreo detenido';
+        }
+
+        btnToggle.addEventListener('click', () => {
+            if (watchId === null) {
+                startTracking();
+            } else {
+                stopTracking();
+            }
+        });
+    </script>
+</body>
+</html>
