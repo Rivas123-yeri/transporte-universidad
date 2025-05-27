@@ -1,81 +1,107 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Estudiante</title>
+    <title>Estudiante - Seguimiento del Bus</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <style>
-        #map { height: 100vh; margin: 0; padding: 0; }
-        body, html { margin: 0; padding: 0; height: 100%; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body, html {
+            height: 100%;
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        header {
+            background-color: #28a745;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-size: 1.2rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        #map {
+            height: calc(100vh - 60px);
+            width: 100%;
+        }
+
+        #status {
+            background-color: #f8f9fa;
+            color: #333;
+            padding: 10px;
+            text-align: center;
+            font-size: 1rem;
+        }
     </style>
 </head>
 <body>
+    <header>🧍 Estudiante - Seguimiento del Bus</header>
+    <div id="status">📍 Buscando tu ubicación...</div>
     <div id="map"></div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
-    const socket = io();
-    const map = L.map('map').setView([0, 0], 15);
-    let marcadorBus = null;
-    let marcadorEstudiante = null;
-    let ruta = [];
-    let polyline = null;
+        const socket = io();
+        const map = L.map('map').setView([0, 0], 2);
 
-    // Carga el mapa base
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
+        let busMarker = null;
+        let userMarker = null;
 
-    // Obtener ubicación del estudiante (tú)
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition((position) => {
-            const lat = position.coords.latitude;
-            const lng = position.coords.longitude;
-            const miUbicacion = [lat, lng];
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
 
-            marcadorEstudiante = L.marker(miUbicacion, {
-                title: "Tú estás aquí",
-                icon: L.icon({
-                    iconUrl: 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png',
-                    iconSize: [25, 41],
-                    iconAnchor: [12, 41]
-                })
-            }).addTo(map);
-
-            map.setView(miUbicacion, 15);
-        }, () => {
-            alert("No se pudo obtener tu ubicación.");
+        // Mostrar ubicación del bus
+        socket.on('ubicacion', (data) => {
+            if (busMarker) {
+                busMarker.setLatLng([data.lat, data.lng]);
+            } else {
+                busMarker = L.marker([data.lat, data.lng], {
+                    icon: L.icon({
+                        iconUrl: 'https://cdn-icons-png.flaticon.com/512/61/61231.png',
+                        iconSize: [32, 32],
+                        iconAnchor: [16, 32]
+                    })
+                }).addTo(map).bindPopup("🚌 Bus");
+            }
         });
-    } else {
-        alert("Tu navegador no permite geolocalización.");
-    }
 
-    // Escuchar ubicación del bus
-    socket.on('ubicacion', (data) => {
-        const ubicacionBus = [data.lat, data.lng];
+        // Mostrar ubicación del estudiante
+        function actualizarUbicacionUsuario() {
+            navigator.geolocation.getCurrentPosition(pos => {
+                const lat = pos.coords.latitude;
+                const lng = pos.coords.longitude;
 
-        if (marcadorBus) {
-            marcadorBus.setLatLng(ubicacionBus);
-        } else {
-            marcadorBus = L.marker(ubicacionBus, {
-                title: "Bus",
-                icon: L.icon({
-                    iconUrl: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
-                    iconSize: [25, 41],
-                    iconAnchor: [12, 41]
-                })
-            }).addTo(map);
+                if (userMarker) {
+                    userMarker.setLatLng([lat, lng]);
+                } else {
+                    userMarker = L.marker([lat, lng], {
+                        icon: L.icon({
+                            iconUrl: 'https://cdn-icons-png.flaticon.com/512/149/149071.png',
+                            iconSize: [32, 32],
+                            iconAnchor: [16, 32]
+                        })
+                    }).addTo(map).bindPopup("📍 Tú");
+
+                    map.setView([lat, lng], 15);
+                }
+
+                document.getElementById("status").innerText = `📌 Tu ubicación: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+            }, () => {
+                document.getElementById("status").innerText = "❌ No se pudo obtener tu ubicación.";
+            });
         }
 
-        // Dibujar la ruta del bus
-        ruta.push(ubicacionBus);
-        if (polyline) {
-            polyline.setLatLngs(ruta);
-        } else {
-            polyline = L.polyline(ruta, { color: 'red' }).addTo(map);
-        }
-    });
-</script>
-
+        // Actualizar ubicación del estudiante cada 10 segundos
+        actualizarUbicacionUsuario();
+        setInterval(actualizarUbicacionUsuario, 10000);
+    </script>
 </body>
 </html>
+
