@@ -1,63 +1,92 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Conductor</title>
+    <title>Conductor - Rastreo en Vivo</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #f4f6f8;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        header {
+            background-color: #007bff;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-size: 1.2rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        #status {
+            padding: 10px;
+            text-align: center;
+            color: #333;
+            background-color: #e9ecef;
+            font-size: 1rem;
+        }
+
+        #map {
+            flex: 1;
+            height: 100%;
+        }
+    </style>
 </head>
 <body>
-    <h1>Conductor - Compartiendo ubicación</h1>
-    <button id="btnToggle">Iniciar rastreo</button>
-    <p id="status">Rastreo detenido</p>
+    <header>📍 Conductor - Rastreo en Tiempo Real</header>
+    <div id="status">Enviando ubicación...</div>
+    <div id="map"></div>
 
     <script src="/socket.io/socket.io.js"></script>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
         const socket = io();
-        let watchId = null;
-        const btnToggle = document.getElementById('btnToggle');
-        const status = document.getElementById('status');
+        const map = L.map('map').setView([0, 0], 2);
+        let marker = null;
 
-        function enviarUbicacion(pos) {
-            socket.emit('ubicacion', {
-                lat: pos.coords.latitude,
-                lng: pos.coords.longitude
-            });
-            status.textContent = `Enviando ubicación: ${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`;
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        function actualizarEstado(mensaje) {
+            document.getElementById('status').innerText = mensaje;
         }
 
-        function errorUbicacion() {
-            alert("No se pudo obtener la ubicación.");
-            stopTracking();
-        }
+        navigator.geolocation.watchPosition(
+            pos => {
+                const lat = pos.coords.latitude;
+                const lng = pos.coords.longitude;
+                socket.emit('ubicacion', { lat, lng });
+                actualizarEstado(`📡 Ubicación enviada: ${lat.toFixed(5)}, ${lng.toFixed(5)}`);
 
-        function startTracking() {
-            if (!navigator.geolocation) {
-                alert("Tu navegador no soporta Geolocalización.");
-                return;
-            }
-            watchId = navigator.geolocation.watchPosition(enviarUbicacion, errorUbicacion, {
+                if (marker) {
+                    marker.setLatLng([lat, lng]);
+                } else {
+                    marker = L.marker([lat, lng]).addTo(map);
+                }
+
+                map.setView([lat, lng], 16);
+            },
+            err => {
+                actualizarEstado('❌ Error al obtener ubicación');
+                console.error(err);
+            },
+            {
                 enableHighAccuracy: true,
-                maximumAge: 3000,
+                maximumAge: 0,
                 timeout: 5000
-            });
-            btnToggle.textContent = 'Detener rastreo';
-            status.textContent = 'Rastreo iniciado...';
-        }
-
-        function stopTracking() {
-            if (watchId !== null) {
-                navigator.geolocation.clearWatch(watchId);
-                watchId = null;
             }
-            btnToggle.textContent = 'Iniciar rastreo';
-            status.textContent = 'Rastreo detenido';
-        }
-
-        btnToggle.addEventListener('click', () => {
-            if (watchId === null) {
-                startTracking();
-            } else {
-                stopTracking();
-            }
-        });
+        );
     </script>
 </body>
 </html>
